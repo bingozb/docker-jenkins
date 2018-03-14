@@ -150,7 +150,7 @@ RUN apk add --no-cache --virtual .build-deps-yarn \
 
 ########################## SSH config #########################
 
-RUN echo "\nHost *\n    StrictHostKeyChecking no\n    UserKnownHostsFile /dev/null" >> /etc/ssh/ssh_config
+RUN echo -e "\nHost *\n    StrictHostKeyChecking no\n    UserKnownHostsFile /dev/null" >> /etc/ssh/ssh_config
 
 # Go back to jenkins user.
 USER jenkins
