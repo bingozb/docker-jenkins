@@ -1,42 +1,156 @@
-FROM jenkins/jenkins:slim
+FROM jenkins/jenkins:alpine
 MAINTAINER bingo <bingov5@icloud.com>
 
 # Jenkins is using jenkins user, we need root to install things.
 USER root
 
-# Install maven and gradle.
-RUN apt-get update && \
-  apt-get -y -f install apt-transport-https wget unzip && \ 
-  mkdir /maven && \
-  curl http://mirror.bit.edu.cn/apache/maven/maven-3/3.5.3/binaries/apache-maven-3.5.3-bin.tar.gz | tar xzf - -C /maven --strip-components=1 && \
-  ln -s /maven/bin/mvn /usr/bin/mvn && \
-  wget -q https://services.gradle.org/distributions/gradle-4.6-bin.zip && \
-  unzip -q gradle-4.6-bin.zip && \
-  rm -rf gradle-4.6-bin.zip && \
-  mv gradle-4.6 gradle && \
-  ln -s /gradle/bin/gradle /usr/bin/gradle
+######################## Maven and Gradle ########################
 
-# Install php and composer.
-RUN apt-get -y -f install php && \
-  mkdir /php-composer && \
-  curl -sS https://getcomposer.org/installer | php -- --install-dir=/php-composer && \
-  ln -s /php-composer/composer.phar /usr/bin/composer
+RUN apk add --no-cache --virtual .maven-gradle-deps wget curl tar unzip \
+  && mkdir /maven \
+    && curl http://mirror.bit.edu.cn/apache/maven/maven-3/3.5.3/binaries/apache-maven-3.5.3-bin.tar.gz | tar xzf - -C /maven --strip-components=1 \
+    && ln -s /maven/bin/mvn /usr/bin/mvn \
+    && wget -q https://services.gradle.org/distributions/gradle-4.6-bin.zip \
+    && unzip -q gradle-4.6-bin.zip \
+    && rm -rf gradle-4.6-bin.zip \
+    && mv gradle-4.6 gradle \
+    && ln -s /gradle/bin/gradle /usr/bin/gradle \
+    && apk del .maven-gradle-deps
 
-# Install node, npm, cnpm and yarn.
-RUN mkdir /nodejs && \
-  curl http://nodejs.org/dist/v8.9.4/node-v8.9.4-linux-x64.tar.gz | tar xzf - -C /nodejs --strip-components=1 && \
-  ln -s /nodejs/bin/node /usr/bin/node && \
-  ln -s /nodejs/bin/npm /usr/bin/npm && \
-  npm install -g cnpm --registry=https://registry.npm.taobao.org && \
-  ln -s /nodejs/bin/cnpm /usr/bin/cnpm && \
-  curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - && \
-  echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list && \
-  apt-get update && \
-  apt-get -y -f install --no-install-recommends yarn && \
-  apt-get clean -y
+############################## PHP and Composer ##############################
 
-# SSH config.
-RUN echo "    StrictHostKeyChecking no\n    UserKnownHostsFile /dev/null" >> /etc/ssh/ssh_config
+ENV PHPIZE_DEPS \
+    autoconf \
+    dpkg-dev dpkg \
+    file \
+    g++ \
+    gcc \
+    libc-dev \
+    make \
+    pkgconf \
+    re2c
+RUN apk add --no-cache --virtual .persistent-deps \
+    ca-certificates \
+    curl \
+    tar \
+    xz \
+    openssl
+
+ENV PHP_INI_DIR /usr/local/etc/php
+RUN mkdir -p $PHP_INI_DIR/conf.d
+
+ENV PHP_CFLAGS="-fstack-protector-strong -fpic -fpie -O2"
+ENV PHP_CPPFLAGS="$PHP_CFLAGS"
+ENV PHP_LDFLAGS="-Wl,-O1 -Wl,--hash-style=both -pie"
+ENV PHP_VERSION 7.1.15
+ENV PHP_URL="https://secure.php.net/get/php-7.1.15.tar.xz/from/this/mirror"
+
+RUN set -xe; \
+  mkdir -p /usr/src; \
+  cd /usr/src; \
+  wget -O php.tar.xz "$PHP_URL"
+
+RUN set -xe \
+  && apk add --no-cache --virtual .build-deps \
+    $PHPIZE_DEPS \
+    coreutils \
+    curl-dev \
+    libedit-dev \
+    openssl-dev \
+    libxml2-dev \
+    sqlite-dev \
+  \
+  && export CFLAGS="$PHP_CFLAGS" \
+    CPPFLAGS="$PHP_CPPFLAGS" \
+    LDFLAGS="$PHP_LDFLAGS" \
+  && mkdir -p /usr/src/php \
+  && tar -Jxf /usr/src/php.tar.xz -C /usr/src/php --strip-components=1 \
+  && cd /usr/src/php \
+  && gnuArch="$(dpkg-architecture --query DEB_BUILD_GNU_TYPE)" \
+  && ./configure \
+    --build="$gnuArch" \
+    --with-config-file-path="$PHP_INI_DIR" \
+    --with-config-file-scan-dir="$PHP_INI_DIR/conf.d" \
+    --disable-cgi \
+    --enable-ftp \
+    --enable-mbstring \
+    --enable-mysqlnd \
+    --with-curl \
+    --with-libedit \
+    --with-openssl \
+    --with-zlib \
+    \
+    $(test "$gnuArch" = 's390x-linux-gnu' && echo '--without-pcre-jit') \
+    \
+    $PHP_EXTRA_CONFIGURE_ARGS \
+  && make -j "$(nproc)" \
+  && make install \
+  && { find /usr/local/bin /usr/local/sbin -type f -perm +0111 -exec strip --strip-all '{}' + || true; } \
+  && ln -s /usr/local/bin/php /usr/bin/php \
+  && make clean \
+  && cd / \
+  && rm -rf /usr/src/php \
+  \
+  && runDeps="$( \
+    scanelf --needed --nobanner --format '%n#p' --recursive /usr/local \
+      | tr ',' '\n' \
+      | sort -u \
+      | awk 'system("[ -e /usr/local/lib/" $1 " ]") == 0 { next } { print "so:" $1 }' \
+  )" \
+  && apk add --no-cache --virtual .php-rundeps $runDeps \
+  \
+  && apk del .build-deps \
+  \
+  && pecl update-channels \
+  && rm -rf /tmp/pear ~/.pearrc
+
+RUN apk add --no-cache --virtual .composer-deps curl \
+  && mkdir /php-composer \
+    && curl -sS https://getcomposer.org/installer | php -- --install-dir=/php-composer \
+    && ln -s /php-composer/composer.phar /usr/bin/composer \
+    && apk del .composer-deps
+
+########################## Node and Yarn #########################
+
+ENV NODE_VERSION 8.9.4
+ENV YARN_VERSION 1.3.2
+ENV SERVER_PORT 3000
+
+RUN apk add --no-cache \
+        libstdc++ \
+    && apk add --no-cache --virtual .build-deps \
+        binutils-gold \
+        curl \
+        g++ \
+        gcc \
+        libgcc \
+        linux-headers \
+        make \
+        python \
+    && curl -SLO "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION.tar.xz" \
+    && tar -xf "node-v$NODE_VERSION.tar.xz" \
+    && cd "node-v$NODE_VERSION" \
+    && ./configure --without-npm \
+    && make -j$(getconf _NPROCESSORS_ONLN) \
+    && make install \
+    && apk del .build-deps \
+    && cd .. \
+    && rm -Rf "node-v$NODE_VERSION" \
+    && rm "node-v$NODE_VERSION.tar.xz"
+
+RUN apk add --no-cache --virtual .build-deps-yarn \
+        curl \
+    && curl -fSLO --compressed "https://yarnpkg.com/downloads/$YARN_VERSION/yarn-v$YARN_VERSION.tar.gz" \
+    && mkdir -p /opt/yarn \
+    && tar -xzf yarn-v$YARN_VERSION.tar.gz -C /opt/yarn --strip-components=1 \
+    && ln -s /opt/yarn/bin/yarn /usr/local/bin/yarn \
+    && ln -s /opt/yarn/bin/yarn /usr/local/bin/yarnpkg \
+    && rm yarn-v$YARN_VERSION.tar.gz \
+    && apk del .build-deps-yarn
+
+########################## SSH config #########################
+
+RUN echo "\nHost *\n    StrictHostKeyChecking no\n    UserKnownHostsFile /dev/null" >> /etc/ssh/ssh_config
 
 # Go back to jenkins user.
 USER jenkins
