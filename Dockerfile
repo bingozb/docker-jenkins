@@ -33,5 +33,8 @@ RUN mkdir /nodejs && \
   apt-get -y -f install --no-install-recommends yarn && \
   apt-get clean -y
 
+# SSH config.
+RUN echo "    StrictHostKeyChecking no\n    UserKnownHostsFile /dev/null" >> /etc/ssh/ssh_config
+
 # Go back to jenkins user.
 USER jenkins
