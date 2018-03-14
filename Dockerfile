@@ -1,21 +1,23 @@
-FROM jenkins
+FROM jenkins/jenkins:slim
 MAINTAINER bingo <bingov5@icloud.com>
 
 # Jenkins is using jenkins user, we need root to install things.
 USER root
 
 # Install maven and gradle.
-RUN mkdir /maven && \
+RUN apt-get update && \
+  apt-get -y -f install apt-transport-https wget unzip && \ 
+  mkdir /maven && \
   curl http://mirror.bit.edu.cn/apache/maven/maven-3/3.5.3/binaries/apache-maven-3.5.3-bin.tar.gz | tar xzf - -C /maven --strip-components=1 && \
   ln -s /maven/bin/mvn /usr/bin/mvn && \
   wget -q https://services.gradle.org/distributions/gradle-4.6-bin.zip && \
   unzip -q gradle-4.6-bin.zip && \
+  rm -rf gradle-4.6-bin.zip && \
   mv gradle-4.6 gradle && \
   ln -s /gradle/bin/gradle /usr/bin/gradle
 
 # Install php and composer.
-RUN apt-get update && \
-  apt-get -y -f install apt-transport-https php && \
+RUN apt-get -y -f install php && \
   mkdir /php-composer && \
   curl -sS https://getcomposer.org/installer | php -- --install-dir=/php-composer && \
   ln -s /php-composer/composer.phar /usr/bin/composer
