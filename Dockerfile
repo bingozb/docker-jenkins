@@ -6,14 +6,17 @@ USER root
 
 ######################## Maven and Gradle ########################
 
+ENV MAVEN_VERSION 3.5.3
+ENV GRADLE_VERSION 4.6
+
 RUN apk add --no-cache --virtual .maven-gradle-deps wget curl tar unzip \
   && mkdir /maven \
-    && curl http://mirror.bit.edu.cn/apache/maven/maven-3/3.5.3/binaries/apache-maven-3.5.3-bin.tar.gz | tar xzf - -C /maven --strip-components=1 \
+    && curl http://mirror.bit.edu.cn/apache/maven/maven-3/$MAVEN_VERSION/binaries/apache-maven-$MAVEN_VERSION-bin.tar.gz | tar xzf - -C /maven --strip-components=1 \
     && ln -s /maven/bin/mvn /usr/bin/mvn \
-    && wget -q https://services.gradle.org/distributions/gradle-4.6-bin.zip \
-    && unzip -q gradle-4.6-bin.zip \
-    && rm -rf gradle-4.6-bin.zip \
-    && mv gradle-4.6 gradle \
+    && wget -q https://services.gradle.org/distributions/gradle-$GRADLE_VERSION-bin.zip \
+    && unzip -q gradle-$GRADLE_VERSION-bin.zip \
+    && rm -rf gradle-$GRADLE_VERSION-bin.zip \
+    && mv gradle-$GRADLE_VERSION gradle \
     && ln -s /gradle/bin/gradle /usr/bin/gradle \
     && apk del .maven-gradle-deps
 
@@ -36,14 +39,13 @@ RUN apk add --no-cache --virtual .persistent-deps \
     xz \
     openssl
 
-ENV PHP_INI_DIR /usr/local/etc/php
-RUN mkdir -p $PHP_INI_DIR/conf.d
-
+ENV PHP_VERSION 7.1.15
 ENV PHP_CFLAGS="-fstack-protector-strong -fpic -fpie -O2"
 ENV PHP_CPPFLAGS="$PHP_CFLAGS"
 ENV PHP_LDFLAGS="-Wl,-O1 -Wl,--hash-style=both -pie"
-ENV PHP_VERSION 7.1.15
-ENV PHP_URL="https://secure.php.net/get/php-7.1.15.tar.xz/from/this/mirror"
+ENV PHP_URL="https://secure.php.net/get/php-$PHP_VERSION.tar.xz/from/this/mirror"
+ENV PHP_INI_DIR /usr/local/etc/php
+RUN mkdir -p $PHP_INI_DIR/conf.d
 
 RUN set -xe; \
   mkdir -p /usr/src; \
@@ -114,7 +116,6 @@ RUN apk add --no-cache --virtual .composer-deps curl \
 
 ENV NODE_VERSION 8.9.4
 ENV YARN_VERSION 1.3.2
-ENV SERVER_PORT 3000
 
 RUN apk add --no-cache \
         libstdc++ \
