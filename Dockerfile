@@ -56,14 +56,14 @@ ENV GRADLE_VERSION 4.6
 
 RUN apk add --no-cache --virtual .maven-gradle-deps wget curl tar unzip \
   && mkdir /maven \
-    && curl http://mirror.bit.edu.cn/apache/maven/maven-3/$MAVEN_VERSION/binaries/apache-maven-$MAVEN_VERSION-bin.tar.gz | tar xzf - -C /maven --strip-components=1 \
-    && ln -s /maven/bin/mvn /usr/bin/mvn \
-    && wget -q https://services.gradle.org/distributions/gradle-$GRADLE_VERSION-bin.zip \
-    && unzip -q gradle-$GRADLE_VERSION-bin.zip \
-    && rm -rf gradle-$GRADLE_VERSION-bin.zip \
-    && mv gradle-$GRADLE_VERSION gradle \
-    && ln -s /gradle/bin/gradle /usr/bin/gradle \
-    && apk del .maven-gradle-deps
+  && curl http://mirror.bit.edu.cn/apache/maven/maven-3/$MAVEN_VERSION/binaries/apache-maven-$MAVEN_VERSION-bin.tar.gz | tar xzf - -C /maven --strip-components=1 \
+  && ln -s /maven/bin/mvn /usr/bin/mvn \
+  && wget -q https://services.gradle.org/distributions/gradle-$GRADLE_VERSION-bin.zip \
+  && unzip -q gradle-$GRADLE_VERSION-bin.zip \
+  && rm -rf gradle-$GRADLE_VERSION-bin.zip \
+  && mv gradle-$GRADLE_VERSION gradle \
+  && ln -s /gradle/bin/gradle /usr/bin/gradle \
+  && apk del .maven-gradle-deps
 
 ############################## PHP and Composer ##############################
 
@@ -153,9 +153,9 @@ RUN set -xe \
 
 RUN apk add --no-cache --virtual .composer-deps curl \
   && mkdir /php-composer \
-    && curl -sS https://getcomposer.org/installer | php -- --install-dir=/php-composer \
-    && ln -s /php-composer/composer.phar /usr/bin/composer \
-    && apk del .composer-deps
+  && curl -sS https://getcomposer.org/installer | php -- --install-dir=/php-composer \
+  && ln -s /php-composer/composer.phar /usr/bin/composer \
+  && apk del .composer-deps
 
 ########################## Node and Yarn #########################
 
@@ -164,7 +164,7 @@ ENV YARN_VERSION 1.3.2
 
 RUN apk add --no-cache \
         libstdc++ \
-    && apk add --no-cache --virtual .build-deps \
+  && apk add --no-cache --virtual .build-deps \
         binutils-gold \
         curl \
         g++ \
@@ -173,26 +173,26 @@ RUN apk add --no-cache \
         linux-headers \
         make \
         python \
-    && curl -SLO "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION.tar.xz" \
-    && tar -xf "node-v$NODE_VERSION.tar.xz" \
-    && cd "node-v$NODE_VERSION" \
-    && ./configure --without-npm \
-    && make -j$(getconf _NPROCESSORS_ONLN) \
-    && make install \
-    && apk del .build-deps \
-    && cd .. \
-    && rm -Rf "node-v$NODE_VERSION" \
-    && rm "node-v$NODE_VERSION.tar.xz"
+  && curl -SLO "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION.tar.xz" \
+  && tar -xf "node-v$NODE_VERSION.tar.xz" \
+  && cd "node-v$NODE_VERSION" \
+  && ./configure --without-npm \
+  && make -j$(getconf _NPROCESSORS_ONLN) \
+  && make install \
+  && apk del .build-deps \
+  && cd .. \
+  && rm -Rf "node-v$NODE_VERSION" \
+  && rm "node-v$NODE_VERSION.tar.xz"
 
 RUN apk add --no-cache --virtual .build-deps-yarn \
         curl \
-    && curl -fSLO --compressed "https://yarnpkg.com/downloads/$YARN_VERSION/yarn-v$YARN_VERSION.tar.gz" \
-    && mkdir -p /opt/yarn \
-    && tar -xzf yarn-v$YARN_VERSION.tar.gz -C /opt/yarn --strip-components=1 \
-    && ln -s /opt/yarn/bin/yarn /usr/local/bin/yarn \
-    && ln -s /opt/yarn/bin/yarn /usr/local/bin/yarnpkg \
-    && rm yarn-v$YARN_VERSION.tar.gz \
-    && apk del .build-deps-yarn
+  && curl -fSLO --compressed "https://yarnpkg.com/downloads/$YARN_VERSION/yarn-v$YARN_VERSION.tar.gz" \
+  && mkdir -p /opt/yarn \
+  && tar -xzf yarn-v$YARN_VERSION.tar.gz -C /opt/yarn --strip-components=1 \
+  && ln -s /opt/yarn/bin/yarn /usr/local/bin/yarn \
+  && ln -s /opt/yarn/bin/yarn /usr/local/bin/yarnpkg \
+  && rm yarn-v$YARN_VERSION.tar.gz \
+  && apk del .build-deps-yarn
 
 ########################## SSH config #########################
 
