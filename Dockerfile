@@ -4,6 +4,12 @@ MAINTAINER bingo <bingov5@icloud.com>
 # Jenkins is using jenkins user, we need root to install things.
 USER root
 
+# timezone
+ENV TIMEZONE Asia/Shanghai
+RUN apk add --no-cache tzdata \
+    && ln -snf /usr/share/zoneinfo/$TIMEZONE /etc/localtime \
+    && echo $TIMEZONE > /etc/timezone
+
 ######################## Docker in Docker ########################
 
 RUN apk add --no-cache \
