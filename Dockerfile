@@ -182,9 +182,10 @@ RUN apk add --no-cache \
   && curl -SLO "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION.tar.xz" \
   && tar -xf "node-v$NODE_VERSION.tar.xz" \
   && cd "node-v$NODE_VERSION" \
-  && ./configure --without-npm \
+  && ./configure \
   && make -j$(getconf _NPROCESSORS_ONLN) \
   && make install \
+  && npm install cnpm -g --registry=https://registry.npm.taobao.org \
   && apk del .build-deps \
   && cd .. \
   && rm -Rf "node-v$NODE_VERSION" \
