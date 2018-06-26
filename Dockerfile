@@ -10,6 +10,9 @@ RUN apk add --no-cache tzdata \
     && ln -snf /usr/share/zoneinfo/$TIMEZONE /etc/localtime \
     && echo $TIMEZONE > /etc/timezone
 
+# zip unzip
+RUN apk add --no-cache zip unzip
+
 ######################## Docker in Docker ########################
 
 RUN apk add --no-cache \
