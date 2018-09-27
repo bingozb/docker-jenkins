@@ -60,7 +60,7 @@ RUN set -ex; \
 
 ######################## Maven and Gradle ########################
 
-ENV MAVEN_VERSION 3.5.3
+ENV MAVEN_VERSION 3.5.4
 ENV GRADLE_VERSION 4.6
 
 RUN apk add --no-cache --virtual .maven-gradle-deps wget curl tar unzip \
@@ -86,48 +86,63 @@ ENV PHPIZE_DEPS \
     make \
     pkgconf \
     re2c
+
 RUN apk add --no-cache --virtual .persistent-deps \
     ca-certificates \
     curl \
     tar \
     xz \
-    openssl
+    libressl
 
-ENV PHP_VERSION 7.1.15
-ENV PHP_CFLAGS="-fstack-protector-strong -fpic -fpie -O2"
-ENV PHP_CPPFLAGS="$PHP_CFLAGS"
-ENV PHP_LDFLAGS="-Wl,-O1 -Wl,--hash-style=both -pie"
-ENV PHP_URL="https://secure.php.net/get/php-$PHP_VERSION.tar.xz/from/this/mirror"
+RUN set -x \
+  && addgroup -g 82 -S www-data \
+  && adduser -u 82 -D -S -G www-data www-data
+
 ENV PHP_INI_DIR /usr/local/etc/php
 RUN mkdir -p $PHP_INI_DIR/conf.d
 
+ENV PHP_CFLAGS="-fstack-protector-strong -fpic -fpie -O2"
+ENV PHP_CPPFLAGS="$PHP_CFLAGS"
+ENV PHP_LDFLAGS="-Wl,-O1 -Wl,--hash-style=both -pie"
+
+ENV PHP_VERSION 5.6.38
+ENV PHP_URL="https://secure.php.net/get/php-5.6.38.tar.xz/from/this/mirror"
+
 RUN set -xe; \
+  apk add --no-cache --virtual .fetch-deps \
+    gnupg \
+    wget \
+  ; \
   mkdir -p /usr/src; \
   cd /usr/src; \
-  wget -O php.tar.xz "$PHP_URL"
+  wget -O php.tar.xz "$PHP_URL"; \
+  apk del .fetch-deps
+
+COPY php/docker-php-* /usr/local/bin/
 
 RUN set -xe \
+  && chmod +x /usr/local/bin/docker-php-* \
   && apk add --no-cache --virtual .build-deps \
     $PHPIZE_DEPS \
     coreutils \
     curl-dev \
     libedit-dev \
-    openssl-dev \
+    libressl-dev \
     libxml2-dev \
     sqlite-dev \
   \
   && export CFLAGS="$PHP_CFLAGS" \
     CPPFLAGS="$PHP_CPPFLAGS" \
     LDFLAGS="$PHP_LDFLAGS" \
-  && mkdir -p /usr/src/php \
-  && tar -Jxf /usr/src/php.tar.xz -C /usr/src/php --strip-components=1 \
+  && docker-php-source extract \
   && cd /usr/src/php \
   && gnuArch="$(dpkg-architecture --query DEB_BUILD_GNU_TYPE)" \
   && ./configure \
     --build="$gnuArch" \
     --with-config-file-path="$PHP_INI_DIR" \
     --with-config-file-scan-dir="$PHP_INI_DIR/conf.d" \
-    --disable-cgi \
+    --enable-option-checking=fatal \
+    --with-mhash \
     --enable-ftp \
     --enable-mbstring \
     --enable-mysqlnd \
@@ -142,11 +157,11 @@ RUN set -xe \
   && make -j "$(nproc)" \
   && make install \
   && { find /usr/local/bin /usr/local/sbin -type f -perm +0111 -exec strip --strip-all '{}' + || true; } \
-  && ln -s /usr/local/bin/php /usr/bin/php \
   && make clean \
-  && cd / \
-  && rm -rf /usr/src/php \
   \
+  && cp -v php.ini-* "$PHP_INI_DIR/" \
+  && cd / \
+  && docker-php-source delete \
   && runDeps="$( \
     scanelf --needed --nobanner --format '%n#p' --recursive /usr/local \
       | tr ',' '\n' \
@@ -154,12 +169,27 @@ RUN set -xe \
       | awk 'system("[ -e /usr/local/lib/" $1 " ]") == 0 { next } { print "so:" $1 }' \
   )" \
   && apk add --no-cache --virtual .php-rundeps $runDeps \
-  \
   && apk del .build-deps \
-  \
   && pecl update-channels \
   && rm -rf /tmp/pear ~/.pearrc
 
+
+# mbstring opcache pdo mysql
+RUN docker-php-ext-install mbstring opcache pdo pdo_mysql mysql mysqli
+# gd zip
+RUN apk add --no-cache freetype libpng libjpeg-turbo freetype-dev libpng-dev libjpeg-turbo-dev \
+    && NPROC=$(grep -c ^processor /proc/cpuinfo 2>/dev/null || 1) \
+    && docker-php-ext-configure gd \
+        --with-gd \
+        --with-freetype-dir \
+        --with-png-dir \
+        --with-jpeg-dir \
+        --with-zlib-dir \
+    && docker-php-ext-install -j${NPROC} gd zip \
+    && apk del freetype-dev libpng-dev libjpeg-turbo-dev
+
+
+# composer
 RUN apk add --no-cache --virtual .composer-deps curl \
   && mkdir /php-composer \
   && curl -sS https://getcomposer.org/installer | php -- --install-dir=/php-composer \
