@@ -198,7 +198,7 @@ RUN apk add --no-cache --virtual .composer-deps curl \
 
 ########################## Node and Yarn #########################
 
-ENV NODE_VERSION 8.9.4
+ENV NODE_VERSION 8.16.1
 ENV YARN_VERSION 1.3.2
 
 RUN apk add --no-cache \
